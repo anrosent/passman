@@ -6,7 +6,7 @@ GPGID=""
 
 # Declare our global vars
 NAME=""
-COMMAND="list" # Default command
+COMMAND="default" 
 
 ###### Utility Functions #######
 ### Lib Funcs
@@ -47,11 +47,11 @@ load_gpgid () {
 ###### End Utility Functions #######
 
 # Store a password in PassMan
-create () {
+store () {
     check_not_exists $NAME
     echo "Creating password: $NAME"
     echo "Enter your password, followed by [ENTER]:"
-    read password
+    read -s password
     
     NEW_SECRET_FILE=$SECRETS_DIR/$NAME
     echo $password | gpg --homedir=$KEY_DIR -r "$GPGID" --encrypt --output $NEW_SECRET_FILE 
@@ -76,7 +76,7 @@ get () {
 # List the names of the passwords registered with PassMan
 list () {
     echo "PassMan Registry:"
-    ls $SECRETS_DIR 
+    ls $SECRETS_DIR | sed -e 's/\s\s*/\n/g'
 }
 
 init () 
@@ -115,7 +115,7 @@ init ()
 usage ()
 {
     echo "Usage:"
-    echo "passman [[-c|--create] secret_name]"
+    echo "passman [[-s|--store] secret_name]"
     exit 0
 }
 
@@ -129,30 +129,29 @@ main()
     do 
         arg="$1"
         case $arg in
-            -c|--create)
-                COMMAND="create"; shift
+            -s|--store)
+                COMMAND="store"; shift
                 ;;
             *)
                 NAME=$arg; shift
-                COMMAND="get"
                 ;;
         esac
     done
 
-
     # Execute the command
     case $COMMAND in
-        get)
+        store)
             assert "$NAME" "You must provide a secret name!"
-            get $NAME
+            store $NAME;
             ;;
-        create)
-            assert "$NAME" "You must provide a secret name!"
-            create $NAME;
-            ;;
-        list)
-            list $NAME;
-            ;;
+        default)
+            if [[ -z "$NAME" ]];
+            then
+                list;
+            else
+                get $NAME;
+            fi
+                ;;
     esac
 }
 

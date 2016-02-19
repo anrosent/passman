@@ -32,3 +32,4 @@ The password for myspace has been placed on your clipboard!
 
 - Tab completion for retrieval
 - Use gpg-agent so you don't have to input master pass on every retrieval
+- Store usernames too

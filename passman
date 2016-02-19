@@ -2,6 +2,7 @@
 HOME=~/.passman
 KEY_DIR=$HOME/keys
 SECRETS_DIR=$HOME/secrets
+USERNAMES_DIR=$HOME/users
 GPGID=""
 
 # Declare our global vars
@@ -49,12 +50,16 @@ load_gpgid () {
 # Store a password in PassMan
 store () {
     check_not_exists $NAME
-    echo "Creating password: $NAME"
+    echo "Creating password: $NAME (user:$USERNAME)"
     echo "Enter your password, followed by [ENTER]:"
     read -s password
     
     NEW_SECRET_FILE=$SECRETS_DIR/$NAME
     echo $password | gpg --homedir=$KEY_DIR -r "$GPGID" --encrypt --output $NEW_SECRET_FILE 
+    if [[ -n "$USERNAME" ]];
+    then
+        echo $USERNAME > $USERNAMES_DIR/$NAME
+    fi
     echo "Password $NAME successfully encrypted and stored"
 }
 
@@ -69,8 +74,20 @@ get () {
     read -s password
 
     #TODO: portable clip to MAC
-    echo $password | gpg --homedir=$KEY_DIR -q --batch --passphrase-fd 0 --decrypt $SECRET_FILE | xclip -i -sel c
+    secret="$(echo $password | gpg --homedir=$KEY_DIR -q --batch --passphrase-fd 0 --decrypt $SECRET_FILE)"
+    if [[ $? -ne 0 ]];
+    then 
+        echo "Master password incorrect. Exiting..."
+        exit 1
+    fi
+    echo $secret | xclip -i -sel c
     echo "The password for $NAME has been placed on your clipboard!"
+
+    if [[ -f $USERNAMES_DIR/$NAME ]];
+    then
+        username="$(cat $USERNAMES_DIR/$NAME)"
+        echo "Username is $username"
+    fi
 }
 
 # List the names of the passwords registered with PassMan
@@ -87,12 +104,12 @@ init ()
     assert "$(which gpg)" "No installation of Gnu Privacy Guard (GPG) detected. You must install it."
 
     # Check install dirs
-    if [[ ! -d $HOME || ! -d $KEY_DIR || ! -d $SECRETS_DIR ]];
+    if [[ ! -d $HOME || ! -d $KEY_DIR || ! -d $SECRETS_DIR || ! -d $USERNAMES_DIR ]];
     then
         echo "Incomplete installation in $HOME"
         echo "Creating directories..."
-        mkdir -p $HOME/{keys,secrets}
-        chmod 700 $HOME/{keys,secrets}
+        mkdir -p {$KEY_DIR,$SECRETS_DIR,$USERNAMES_DIR}
+        chmod 700 {$KEY_DIR,$SECRETS_DIR,$USERNAMES_DIR}
         SETUP=true
     fi
 
@@ -131,6 +148,10 @@ main()
         case $arg in
             -s|--store)
                 COMMAND="store"; shift
+                ;;
+            -u|--user)
+                shift;
+                USERNAME=$1; shift
                 ;;
             *)
                 NAME=$arg; shift
